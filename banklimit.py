@@ -23,7 +23,8 @@ class BankLimit:
             print("4. Preset Categories (50/30/20 Rule)")
             print("5. Change Limit")
             print("6. View Total Budget")
-            print("7. Exit")
+            print("7. Save Budget to CSV")
+            print("8. Exit")
 
             choice = input("Enter your choice: ")
 
@@ -40,76 +41,149 @@ class BankLimit:
             elif choice == "6":
                 self.view_total_budget()
             elif choice == "7":
+                self.save_to_csv()
+            elif choice == "8":
                 print("Exiting the program. Goodbye!")
                 break
             else:
                 print("Invalid choice. Please try again.")
-
+    
+    #implement the add_category method
     def add_category(self):
         category = input("Enter the category: ").title()
+
+        if category in self.categories:
+            print("Category already exists.")
+            return
+
         try:
             limit = float(input("Enter the limit: "))
         except ValueError:
             print("The limit must be a number.")
             return
-        except EOFError:
-            print("Input error. Please try again.")
-            return
+
         if limit < 0:
             print("Limit cannot be negative.")
             return
-        else:
-            print(f"Category '{category}' added with limit ${limit:.2f}.")
 
-        subcategory = input(
-            "Would you like to add a subcategory? (yes/no): "
+        if limit > self.monthly_salary:
+            print(
+                f"Cannot add ${limit:.2f}. "
+                f"Your monthly salary is only ${self.monthly_salary:.2f}."
+            )
+            return
+        #subcategories inside the category dictionary
+        self.categories[category] = {
+            "limit": limit,
+            "subcategories": {}
+        }
+
+        print(f"Category '{category}' added with limit ${limit:.2f}.")
+
+        choice = input(
+            "Would you like to add subcategories? (yes/no): "
         ).lower()
-        if subcategory == "yes":
-            subcategory = input("Enter the subcategory: ").title()
+
+        if choice == "yes":
+            self.add_subcategories(category)
+
+    def add_subcategories(self, category):
+        while True:
+            subcategory = input(
+                f"Enter a subcategory for {category} "
+                "(or type 'done' to finish): "
+            ).title()
+
+            if subcategory.lower() == "done":
+                break
+
+            if subcategory in self.categories[category]["subcategories"]:
+                print("Subcategory already exists.")
+                continue
+
             try:
-                limit = float(input("Enter the limit for the subcategory: "))
+                limit = float(
+                    input(f"Enter the limit for {subcategory}: ")
+                )
             except ValueError:
                 print("The limit must be a number.")
-                return
-            except EOFError:
-                print("Input error. Please try again.")
-                return
+                continue
+
             if limit < 0:
                 print("Limit cannot be negative.")
-                return
+                continue
 
-            if isinstance(self.categories[category], dict):
-                self.categories[category][subcategory] = limit
-            else:
-                self.categories[category] = {subcategory: limit}
+            used = sum(
+                self.categories[category]["subcategories"].values()
+            )
 
-            print(f"Subcategory '{subcategory}' added under '{category}'.")
-        else:
-            self.categories[category] = limit
-        print("Category added.")
+            category_limit = self.categories[category]["limit"]
+            remaining = category_limit - used
+
+            if limit > remaining:
+                print(
+                    f"Cannot add ${limit:.2f}. "
+                    f"{category} only has ${remaining:.2f} remaining."
+                )
+                continue
+
+            self.categories[category]["subcategories"][subcategory] = limit
+
+            print(
+                f"Subcategory '{subcategory}' added under '{category}'."
+            )
 
     def show_categories(self):
         if not self.categories:
             print("No categories have been added.")
             return
 
-        for category, limit in self.categories.items():
-            print(f"{category}: ${limit:.2f}")
+        for category, info in self.categories.items():
+            print(f"\n{category}: ${info['limit']:.2f}")
+
+            subcategories = info["subcategories"]
+
+            if subcategories:
+                used = 0
+
+                for subcategory, limit in subcategories.items():
+                    print(f"  - {subcategory}: ${limit:.2f}")
+                    used += limit
+
+                remaining = info["limit"] - used
+
+                print(f"  Used: ${used:.2f}")
+                print(f"  Remaining in {category}: ${remaining:.2f}")
 
     def view_total_budget(self):
-        total = self.monthly_salary
-        print(f"Total Budget: ${total:.2f}")
-        allocated = sum(self.categories.values())
+        if self.monthly_salary <= 0:
+            print("No salary has been entered yet.")
+            return
+
+        allocated = sum(
+            info["limit"]
+            for info in self.categories.values()
+        )
+
+        remaining = self.monthly_salary - allocated
+
+        print(f"Monthly Income: ${self.monthly_salary:.2f}")
         print(f"Allocated Budget: ${allocated:.2f}")
-        remaining = total - allocated
         print(f"Remaining Budget: ${remaining:.2f}")
 
     def remove_category(self):
-        print("Current Categories:")
-        for category, limit in self.categories.items():
-            print(f"{category}: ${limit:.2f}")
+        if not self.categories:
+            print("No categories have been added.")
+            return
 
-        category = input("Enter the category to remove: ").title()
+        print("Current Categories:")
+
+        for category, info in self.categories.items():
+            print(f"{category}: ${info['limit']:.2f}")
+
+        category = input(
+            "Enter the category to remove: "
+        ).title()
 
         if category not in self.categories:
             print("Category does not exist.")
@@ -120,98 +194,144 @@ class BankLimit:
 
     def preset_categories(self):
         try:
-            yearly_salary = float(input("Enter your yearly income/salary: "))
+            salary_type = input(
+                "What is the frequency of your salary? (yearly/monthly/bi-weekly/weekly): "
+            ).lower()
+            
+            if salary_type is "yearly":
+                yearly_salary = float(
+                    input("Enter your yearly income/salary: ")
+                )
+                
+                self.monthly_salary = yearly_salary / 12
+            elif salary_type is "monthly":
+                self.monthly_salary = float(
+                    input("Enter your monthly income/salary: ")
+                )
+            elif salary_type is "bi-weekly":
+                bi_weekly_salary = float(
+                    input("Enter your bi-weekly income/salary: ")
+                )  
+                self.monthly_salary = bi_weekly_salary * 26 / 12
+            elif salary_type is "weekly":
+                weekly_salary = float(
+                    input("Enter your weekly income/salary: ")
+                )
+                
+                self.monthly_salary = weekly_salary * 52 / 12
+            else:
+                print("Invalid salary frequency.")
+                return
+           
         except ValueError:
             print("Salary must be a number.")
             return
-        except EOFError:
-            print("Input error. Please try again.")
+        
+        if salary_type == "yearly":
+            self.yearly_salary = float(input("Enter your yearly income/salary: "))
+            self.monthly_salary = self.yearly_salary / 12
+            self.bi_weekly_salary = self.yearly_salary / 26
+            self.weekly_salary = self.yearly_salary / 52
+        elif salary_type == "monthly":
+            self.monthly_salary = float(input("Enter your monthly income/salary: "))
+            self.yearly_salary = self.monthly_salary * 12
+            self.bi_weekly_salary = self.monthly_salary * 12 / 26
+            self.weekly_salary = self.monthly_salary * 12 / 52
+        elif salary_type == "bi-weekly":
+            self.bi_weekly_salary = float(input("Enter your bi-weekly income/salary: "))
+            self.monthly_salary = self.bi_weekly_salary * 26 / 12
+            self.yearly_salary = self.monthly_salary * 12
+            self.weekly_salary = self.bi_weekly_salary / 2
+        elif salary_type == "weekly":
+            self.weekly_salary = float(input("Enter your weekly income/salary: "))
+            self.monthly_salary = self.weekly_salary * 52 / 12
+            self.bi_weekly_salary = self.weekly_salary * 2
+            self.yearly_salary = self.weekly_salary * 52
+        else:
+            print("Invalid salary frequency.")
             return
 
-        if yearly_salary < 0:
-            print("Yearly salary cannot be negative.")
+        if self.yearly_salary <= 0:
+            print("Yearly salary must be greater than zero.")
+            return
+        elif self.monthly_salary <= 0:
+            print("Monthly salary must be greater than zero.")
+            return
+        elif self.weekly_salary <= 0:
+            print("Weekly salary must be greater than zero.")
+            return
+        elif self.bi_weekly_salary <= 0:
+            print("Bi-weekly salary must be greater than zero.")
             return
 
-        self.yearly_salary = yearly_salary
-        self.monthly_salary = yearly_salary / 12
-        print(f"Your monthly salary is: ${self.monthly_salary:.2f}")
+        def calculate_salary(salary_type, salary):
+            if salary_type == "yearly":
+                print(
+                    f"Your monthly salary is: ${self.monthly_salary:.2f}\n"
+                    f"Your biweekly salary is: ${self.bi_weekly_salary:.2f}\n"
+                    f"Your weekly salary is: ${self.weekly_salary:.2f}\n"
+                    f"Your yearly salary is: ${self.yearly_salary:.2f}"
+                )
+                return salary / 12
+            elif salary_type == "monthly":
+                print(
+                    f"Your yearly salary is: ${self.yearly_salary:.2f}\n"
+                    f"Your biweekly salary is: ${self.bi_weekly_salary:.2f}\n"
+                    f"Your weekly salary is: ${self.weekly_salary:.2f}\n"
+                    f"Your monthly salary is: ${self.monthly_salary:.2f}"
+                )
+                return salary
+            elif salary_type == "bi-weekly":
+                print(
+                    f"Your yearly salary is: ${self.yearly_salary:.2f}\n"
+                    f"Your monthly salary is: ${self.monthly_salary:.2f}\n"
+                    f"Your weekly salary is: ${self.weekly_salary:.2f}\n"
+                    f"Your biweekly salary is: ${self.bi_weekly_salary:.2f}"
+                )
+                return salary * 26 / 12
+            elif salary_type == "weekly":
+                print(
+                    f"Your yearly salary is: ${self.yearly_salary:.2f}\n"
+                    f"Your monthly salary is: ${self.monthly_salary:.2f}\n"
+                    f"Your biweekly salary is: ${self.bi_weekly_salary:.2f}\n"
+                    f"Your weekly salary is: ${self.weekly_salary:.2f}"
+                )
+                return salary * 52 / 12
+            else:
+                raise ValueError("Invalid salary type.")
 
         self.categories = {
-            "Needs": self.monthly_salary * 0.50,
-            "Wants": self.monthly_salary * 0.30,
-            "Savings": self.monthly_salary * 0.20,
+            "Needs": {
+                "limit": self.monthly_salary * 0.50,
+                "subcategories": {}
+            },
+            "Wants": {
+                "limit": self.monthly_salary * 0.30,
+                "subcategories": {}
+            },
+            "Savings": {
+                "limit": self.monthly_salary * 0.20,
+                "subcategories": {}
+            }
         }
-
-        choose_subcategory = input(
-            "Would you like to add subcategories to the preset "
-            "categories? (yes/no): "
-        ).lower()
-
-        if choose_subcategory == "yes":
-            for category in ["Needs", "Wants", "Savings"]:
-                add_sub = input(
-                    "Would you like to add subcategories to "
-                    f"{category}? (yes/no): "
-                ).lower()
-                if add_sub == "yes":
-                    while True:
-                        subcategory = input(
-                            "Enter a subcategory for "
-                            f"{category} (or type 'done' to finish): "
-                        ).title()
-                        if subcategory.lower() == "done":
-                            break
-                        try:
-                            limit = float(
-                                input(f"Enter the limit for {subcategory}: ")
-                            )
-                        except ValueError:
-                            print("The limit must be a number.")
-                            continue
-                        except EOFError:
-                            print("Input error. Please try again.")
-                            continue
-                        if limit < 0:
-                            print("Limit cannot be negative.")
-                            continue
-
-                        if isinstance(self.categories[category], dict):
-                            self.categories[category][subcategory] = limit
-                        else:
-                            self.categories[category] = {subcategory: limit}
-
-                        print(
-                            f"Subcategory '{subcategory}' added under "
-                            f"'{category}'."
-                        )
 
         print("50/30/20 preset added.")
 
-        def category_total(value):
-            if isinstance(value, dict):
-                return sum(value.values())
-            return value
+        self.show_categories()
 
-        preset_total = sum(
-            category_total(value)
-            for value in self.categories.values()
-        )
+        choice = input(
+            "\nWould you like to add subcategories "
+            "to the preset categories? (yes/no): "
+        ).lower()
 
-        for category, value in self.categories.items():
-            if isinstance(value, dict):
-                print(
-                    f"{category}: ${sum(value.values()):.2f} "
-                    "(subtotal from subcategories)"
-                )
-            else:
-                print(f"{category}: ${value:.2f}")
-        print(f"Total: ${preset_total:.2f}")
+        if choice == "yes":
+            for category in ["Needs", "Wants", "Savings"]:
+                add_sub = input(
+                    f"Add subcategories to {category}? (yes/no): "
+                ).lower()
 
-        if preset_total > self.monthly_salary:
-            print(
-                "Warning: The total of preset categories exceeds "
-                "your monthly salary."
-            )
+                if add_sub == "yes":
+                    self.add_subcategories(category)
 
     def change_limit(self):
         if self.locked:
@@ -237,29 +357,40 @@ class BankLimit:
             print("The limit must be a number.")
             return
 
-        except EOFError:
-            print("Input error. Please try again.")
-            return
-
         if new_limit < 0:
             print("Limit cannot be negative.")
             return
 
-        old_limit = self.categories[category]
-        self.categories[category] = new_limit
+        subcategory_total = sum(
+            self.categories[category]["subcategories"].values()
+        )
+
+        if new_limit < subcategory_total:
+            print(
+                f"Cannot lower {category} to ${new_limit:.2f}."
+            )
+            print(
+                f"Its subcategories already total "
+                f"${subcategory_total:.2f}."
+            )
+            return
+
+        old_limit = self.categories[category]["limit"]
+
+        self.categories[category]["limit"] = new_limit
         self.change_count += 1
 
         changes_left = self.max_changes - self.change_count
 
-        msg1 = (
-            f"{category} changed from ${old_limit:.2f} to "
-            f"${new_limit:.2f}."
+        print(
+            f"{category} changed from "
+            f"${old_limit:.2f} to ${new_limit:.2f}."
         )
-        msg2 = f"Changes used: {self.change_count}/{self.max_changes}."
-        msg3 = f"Changes remaining: {changes_left}."
-        print(msg1)
-        print(msg2)
-        print(msg3)
+        print(
+            f"Changes used: "
+            f"{self.change_count}/{self.max_changes}."
+        )
+        print(f"Changes remaining: {changes_left}.")
 
         if self.change_count >= self.max_changes:
             self.locked = True
@@ -267,14 +398,44 @@ class BankLimit:
 
     def save_to_csv(self, filename="budget.csv"):
         try:
-            with open(filename, 'w', newline='') as file:
+            with open(filename, "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(["Category", "Limit"])
-                for category, limit in self.categories.items():
-                    writer.writerow([category, limit])
+
+                writer.writerow(
+                    [
+                        "Category",
+                        "Category Limit",
+                        "Subcategory",
+                        "Subcategory Limit"
+                    ]
+                )
+
+                for category, info in self.categories.items():
+                    subcategories = info["subcategories"]
+
+                    if not subcategories:
+                        writer.writerow(
+                            [
+                                category,
+                                info["limit"],
+                                "",
+                                ""
+                            ]
+                        )
+
+                    else:
+                        for subcategory, sub_limit in subcategories.items():
+                            writer.writerow(
+                                [
+                                    category,
+                                    info["limit"],
+                                    subcategory,
+                                    sub_limit
+                                ]
+                            )
+
             print(f"Budget saved to {filename}")
-        except Exception as e:
-            print(f"Error saving file: {e}")
+
         except Exception as e:
             print(f"Error saving file: {e}")
 
