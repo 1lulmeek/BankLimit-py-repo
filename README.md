@@ -1,4 +1,7 @@
 # BankLimit-py-repo
+
+## !!!! IN PROGRESS !!! 
+
 # BankLimit
 
 BankLimit is a Python command-line budgeting application designed to help users create and manage personalized spending categories and spending limits.
